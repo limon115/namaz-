@@ -18,10 +18,7 @@ jobs:
       - name: Extract ZIP project
         run: |
           mkdir -p project
-          shopt -s nullglob
-          for f in *.zip; do
-            unzip -o "$f" -d project
-          done
+          unzip -o "*.zip" -d project || echo "No zip found"
 
 
       - name: Setup Java 17
@@ -44,24 +41,21 @@ jobs:
 
       - name: Detect Android project root
         run: |
-          ROOT=$(find project -type f \( -name "settings.gradle" -o -name "settings.gradle.kts" \) | head -n 1 | xargs dirname)
+          ROOT=$(find project -name "settings.gradle" | head -n 1 | xargs dirname)
           echo "ROOT=$ROOT" >> $GITHUB_ENV
-          echo "Detected project root: $ROOT"
+          echo "Detected root: $ROOT"
 
 
       - name: Fix Gradle repository conflict
         run: |
           find project -name "settings.gradle*" -exec sed -i 's/PREFER_SETTINGS/PREFER_PROJECT/g' {} +
-          find project -name "settings.gradle*" -exec sed -i 's/FAIL_ON_PROJECT_REPOS/PREFER_PROJECT/g' {} +
 
 
-      - name: Fix gradle.properties safely
+      - name: Fix gradle.properties
         run: |
           FILE="$ROOT/gradle.properties"
           touch "$FILE"
           echo "" >> "$FILE"
-
-          sed -i 's/trueandroid.useAndroidX=true/true/g' "$FILE"
 
           grep -q "android.useAndroidX" "$FILE" || echo "android.useAndroidX=true" >> "$FILE"
           grep -q "android.enableJetifier" "$FILE" || echo "android.enableJetifier=true" >> "$FILE"
@@ -73,33 +67,21 @@ jobs:
           mkdir -p "$RES/mipmap-anydpi-v26"
           mkdir -p "$RES/values"
 
-          if [ ! -f "$RES/mipmap-anydpi-v26/ic_launcher.xml" ]; then
-            cat <<EOF > "$RES/mipmap-anydpi-v26/ic_launcher.xml"
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <path android:fillColor="#0F9D58" android:pathData="M0,0h108v108h-108z"/>
-</vector>
-EOF
-          fi
+          echo '<vector xmlns:android="http://schemas.android.com/apk/res/android"
+          android:width="108dp"
+          android:height="108dp"
+          android:viewportWidth="108"
+          android:viewportHeight="108">
+          <path android:fillColor="#0F9D58" android:pathData="M0,0h108v108h-108z"/>
+          </vector>' > "$RES/mipmap-anydpi-v26/ic_launcher.xml"
 
-          if [ ! -f "$RES/mipmap-anydpi-v26/ic_launcher_round.xml" ]; then
-            cp "$RES/mipmap-anydpi-v26/ic_launcher.xml" "$RES/mipmap-anydpi-v26/ic_launcher_round.xml"
-          fi
+          cp "$RES/mipmap-anydpi-v26/ic_launcher.xml" "$RES/mipmap-anydpi-v26/ic_launcher_round.xml"
 
-          if [ ! -f "$RES/values/themes.xml" ]; then
-            cat <<EOF > "$RES/values/themes.xml"
-<resources>
-    <style name="Theme.BDPrayer" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
-        <item name="colorPrimary">#0F9D58</item>
-        <item name="colorPrimaryVariant">#0B6E3C</item>
-        <item name="colorOnPrimary">#FFFFFF</item>
-    </style>
-</resources>
-EOF
-          fi
+          echo '<resources>
+          <style name="Theme.BDPrayer" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
+          <item name="colorPrimary">#0F9D58</item>
+          </style>
+          </resources>' > "$RES/values/themes.xml"
 
 
       - name: Prepare Gradle wrapper
@@ -124,5 +106,4 @@ EOF
         uses: actions/upload-artifact@v4
         with:
           name: android-debug-apk
-          path: |
-            project/**/build/outputs/apk/debug/*.apk
+          path: project/**/build/outputs/apk/debug/*.apk
