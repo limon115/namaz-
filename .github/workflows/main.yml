@@ -2,40 +2,79 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ "main", "master" ]
-  pull_request:
-    branches: [ "main", "master" ]
+    branches: ["main"]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
+
+      # Checkout repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+
+      # Extract project ZIP if present
+      - name: Unzip project
+        run: |
+          mkdir project
+          unzip -o "*.zip" -d project || echo "No zip found"
+
+
+      # Setup Java (required for Gradle + Android)
+      - name: Setup JDK
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
-          distribution: 'temurin'
-          cache: gradle
+          distribution: temurin
+          java-version: 17
 
-      - name: Unzip Project
+
+      # Setup Android SDK
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+
+      # Locate Android project root
+      - name: Locate project root
         run: |
-          # Unzip the namaz.zip file
-          unzip namaz.zip
-          # The structure is now: ./namaz/ (containing app, build.gradle, etc.)
+          ROOT=$(find . -name "settings.gradle" -o -name "settings.gradle.kts" | head -n 1 | xargs dirname)
+          echo "ROOT=$ROOT" >> $GITHUB_ENV
+          echo "Project root: $ROOT"
 
-      - name: Grant Execute Permission for Gradlew
-        run: chmod +x namaz/gradlew
 
-      - name: Build with Gradle
-        run: ./gradlew assembleDebug
-        working-directory: ./namaz
+      # Enable AndroidX (safety)
+      - name: Enable AndroidX
+        run: |
+          echo "android.useAndroidX=true" >> "$ROOT/gradle.properties"
+          echo "android.enableJetifier=true" >> "$ROOT/gradle.properties"
 
+
+      # Make gradlew executable if present
+      - name: Prepare Gradle Wrapper
+        run: |
+          cd "$ROOT"
+          if [ -f "./gradlew" ]; then
+            chmod +x gradlew
+          fi
+
+
+      # Build APK
+      - name: Build APK
+        run: |
+          cd "$ROOT"
+          if [ -f "./gradlew" ]; then
+            ./gradlew assembleDebug
+          else
+            gradle assembleDebug
+          fi
+
+
+      # Upload APK artifact
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Bangladesh-Prayer-App-Debug
-          path: namaz/app/build/outputs/apk/debug/app-debug.apk
+          name: android-debug-apk
+          path: |
+            **/build/outputs/apk/debug/*.apk
