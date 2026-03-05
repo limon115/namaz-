@@ -10,17 +10,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
 
-      - name: Unzip project
+      - name: Extract project zip
         run: |
           mkdir -p project
           unzip -o "*.zip" -d project || echo "No zip archive found"
 
 
-      - name: Setup JDK 17
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -31,11 +32,11 @@ jobs:
         uses: android-actions/setup-android@v3
 
 
-      - name: Locate Android project root
+      - name: Detect Android project root
         run: |
-          ROOT=$(find project -name "settings.gradle" -o -name "settings.gradle.kts" | head -n 1 | xargs dirname)
+          ROOT=$(find project -type f \( -name "settings.gradle" -o -name "settings.gradle.kts" \) | head -n 1 | xargs dirname)
           echo "ROOT=$ROOT" >> $GITHUB_ENV
-          echo "Project root detected at: $ROOT"
+          echo "Detected project root: $ROOT"
 
 
       - name: Enable AndroidX
@@ -46,8 +47,8 @@ jobs:
 
       - name: Fix Gradle repository conflict
         run: |
-          find "$ROOT" -name "settings.gradle" -exec sed -i 's/PREFER_SETTINGS/PREFER_PROJECT/g' {} +
-          find "$ROOT" -name "settings.gradle.kts" -exec sed -i 's/PREFER_SETTINGS/PREFER_PROJECT/g' {} +
+          find project -type f -name "settings.gradle*" -exec sed -i 's/PREFER_SETTINGS/PREFER_PROJECT/g' {} +
+          find project -type f -name "settings.gradle*" -exec sed -i 's/FAIL_ON_PROJECT_REPOS/PREFER_PROJECT/g' {} +
 
 
       - name: Prepare Gradle wrapper
@@ -58,18 +59,18 @@ jobs:
           fi
 
 
-      - name: Build Debug APK
+      - name: Build APK
         run: |
           cd "$ROOT"
           if [ -f "./gradlew" ]; then
-            ./gradlew assembleDebug
+            ./gradlew assembleDebug --no-daemon
           else
-            gradle assembleDebug
+            gradle assembleDebug --no-daemon
           fi
 
 
-      - name: Upload APK artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: iftar-timer-debug-apk
+          name: android-debug-apk
           path: project/**/build/outputs/apk/debug/*.apk
