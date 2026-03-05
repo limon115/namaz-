@@ -15,13 +15,13 @@ jobs:
         uses: actions/checkout@v4
 
 
-      - name: Extract project zip
+      - name: Extract ZIP project
         run: |
           mkdir -p project
-          unzip -o "*.zip" -d project || echo "No zip archive found"
+          unzip -o "*.zip" -d project || echo "No zip file found"
 
 
-      - name: Setup Java
+      - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -39,22 +39,29 @@ jobs:
           echo "Detected project root: $ROOT"
 
 
-      - name: Enable AndroidX
-        run: |
-          echo "android.useAndroidX=true" >> "$ROOT/gradle.properties"
-          echo "android.enableJetifier=true" >> "$ROOT/gradle.properties"
-
-
       - name: Fix Gradle repository conflict
         run: |
-          find project -type f -name "settings.gradle*" -exec sed -i 's/PREFER_SETTINGS/PREFER_PROJECT/g' {} +
-          find project -type f -name "settings.gradle*" -exec sed -i 's/FAIL_ON_PROJECT_REPOS/PREFER_PROJECT/g' {} +
+          find project -name "settings.gradle*" -exec sed -i 's/PREFER_SETTINGS/PREFER_PROJECT/g' {} +
+          find project -name "settings.gradle*" -exec sed -i 's/FAIL_ON_PROJECT_REPOS/PREFER_PROJECT/g' {} +
+
+
+      - name: Fix gradle.properties safely
+        run: |
+          FILE="$ROOT/gradle.properties"
+          touch "$FILE"
+
+          echo "" >> "$FILE"
+
+          sed -i 's/trueandroid.useAndroidX=true/true/g' "$FILE"
+
+          grep -q "android.useAndroidX" "$FILE" || echo "android.useAndroidX=true" >> "$FILE"
+          grep -q "android.enableJetifier" "$FILE" || echo "android.enableJetifier=true" >> "$FILE"
 
 
       - name: Prepare Gradle wrapper
         run: |
           cd "$ROOT"
-          if [ -f "./gradlew" ]; then
+          if [ -f "gradlew" ]; then
             chmod +x gradlew
           fi
 
