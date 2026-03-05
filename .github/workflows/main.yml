@@ -1,0 +1,41 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Unzip Project
+        run: |
+          # Unzip the namaz.zip file
+          unzip namaz.zip
+          # The structure is now: ./namaz/ (containing app, build.gradle, etc.)
+
+      - name: Grant Execute Permission for Gradlew
+        run: chmod +x namaz/gradlew
+
+      - name: Build with Gradle
+        run: ./gradlew assembleDebug
+        working-directory: ./namaz
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Bangladesh-Prayer-App-Debug
+          path: namaz/app/build/outputs/apk/debug/app-debug.apk
